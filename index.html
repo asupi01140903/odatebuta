@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ぽちっと1発 おだてブタ｜蹴り逆算ツール</title>
+  <style>
+    :root { --pad: 14px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", Roboto, Arial, sans-serif; margin: 0; background:#f6f7fb; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 18px; }
+    .card { background: #fff; border-radius: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.06); padding: 16px; }
+    h1 { font-size: 18px; margin: 0 0 10px; }
+    .sub { font-size: 12px; color:#666; margin: 0 0 14px; line-height: 1.5; }
+    label { display:block; font-size: 13px; margin: 12px 0 6px; color:#222; }
+    input[type="number"]{
+      width: 100%; box-sizing: border-box; padding: 12px;
+      border: 1px solid #d7dbe7; border-radius: 12px; font-size: 16px;
+      background: #fff;
+    }
+    .row { display:flex; gap: 10px; margin-top: 12px; }
+    button {
+      flex: 1;
+      border: 0; border-radius: 12px; padding: 12px;
+      font-size: 16px; cursor: pointer;
+    }
+    .primary { background:#2563eb; color:#fff; }
+    .ghost { background:#eef2ff; color:#1f2a5a; }
+    .out { margin-top: 14px; padding: 14px; border-radius: 12px; background:#f1f5f9; }
+    .out .big { font-size: 22px; font-weight: 700; }
+    .warn { margin-top: 10px; font-size: 13px; color:#b91c1c; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .mini { font-size: 12px; color:#666; margin-top: 8px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>蹴り逆算ツール（入力：回転数 / 蹴り / SP通過）</h1>
+      <p class="sub">
+        逆算 = 回転数 ÷ { 蹴り ÷ <span class="mono">6.22</span> + SP通過 ÷ <span class="mono">3</span> }
+      </p>
+
+      <label for="rot">回転数</label>
+      <input id="rot" type="number" inputmode="decimal" step="any" placeholder="例：3200" />
+
+      <label for="kick">蹴り</label>
+      <input id="kick" type="number" inputmode="decimal" step="any" placeholder="例：180" />
+
+      <label for="sp">SP通過</label>
+      <input id="sp" type="number" inputmode="decimal" step="any" placeholder="例：90" />
+
+      <div class="row">
+        <button class="primary" id="calc">計算</button>
+        <button class="ghost" id="reset">リセット</button>
+      </div>
+
+      <div class="out" aria-live="polite">
+        <div>逆算結果</div>
+        <div class="big" id="result">—</div>
+        <div class="mini" id="detail">分母：—</div>
+      </div>
+
+      <div class="row">
+        <button class="ghost" id="copy">結果をコピー</button>
+      </div>
+
+      <div class="warn" id="warn" style="display:none;"></div>
+      <div class="mini">
+        ※ 分母（蹴り/6.22 + SP通過/3）が 0 以下になると計算できません。<br/>
+        ※ 小数もOKです。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const rotEl = document.getElementById("rot");
+    const kickEl = document.getElementById("kick");
+    const spEl = document.getElementById("sp");
+    const resultEl = document.getElementById("result");
+    const detailEl = document.getElementById("detail");
+    const warnEl = document.getElementById("warn");
+
+    const KICK_DIV = 6.22;
+    const SP_DIV = 3;
+
+    function toNum(el) {
+      const v = el.value;
+      if (v === "" || v === null || typeof v === "undefined") return NaN;
+      return Number(v);
+    }
+
+    function showWarn(msg) {
+      warnEl.textContent = msg;
+      warnEl.style.display = "block";
+    }
+
+    function clearWarn() {
+      warnEl.textContent = "";
+      warnEl.style.display = "none";
+    }
+
+    function format(n, digits=4) {
+      // 無駄な0を削る形の表示
+      if (!Number.isFinite(n)) return "—";
+      const s = n.toFixed(digits);
+      return s.replace(/\.?0+$/, "");
+    }
+
+    function calc() {
+      clearWarn();
+
+      const rot = toNum(rotEl);
+      const kick = toNum(kickEl);
+      const sp = toNum(spEl);
+
+      if (![rot, kick, sp].every(Number.isFinite)) {
+        resultEl.textContent = "—";
+        detailEl.textContent = "分母：—";
+        showWarn("回転数・蹴り・SP通過をすべて数値で入力してください。");
+        return;
+      }
+
+      const denom = (kick / KICK_DIV) + (sp / SP_DIV);
+
+      if (denom <= 0) {
+        resultEl.textContent = "—";
+        detailEl.textContent = `分母：${format(denom, 6)}`;
+        showWarn("分母が 0 以下です（蹴り/6.22 + SP通過/3）。入力値を確認してください。");
+        return;
+      }
+
+      const inv = rot / denom;
+
+      resultEl.textContent = format(inv, 4);
+      detailEl.textContent = `分母：${format(denom, 6)}（蹴り/6.22 + SP通過/3）`;
+    }
+
+    document.getElementById("calc").addEventListener("click", calc);
+
+    // 入力したら自動で更新（好みで消してOK）
+    [rotEl, kickEl, spEl].forEach(el => el.addEventListener("input", () => {
+      // 3つ全部が入ってそうなら自動計算
+      if (rotEl.value !== "" && kickEl.value !== "" && spEl.value !== "") calc();
+    }));
+
+    document.getElementById("reset").addEventListener("click", () => {
+      rotEl.value = "";
+      kickEl.value = "";
+      spEl.value = "";
+      resultEl.textContent = "—";
+      detailEl.textContent = "分母：—";
+      clearWarn();
+      rotEl.focus();
+    });
+
+    document.getElementById("copy").addEventListener("click", async () => {
+      const text = resultEl.textContent;
+      if (text === "—") { showWarn("計算結果が出てからコピーできます。"); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        clearWarn();
+        showWarn("コピーしました。");
+        warnEl.style.color = "#065f46"; // 一時的に緑
+        setTimeout(() => { warnEl.style.color = "#b91c1c"; clearWarn(); }, 1200);
+      } catch (e) {
+        showWarn("コピーに失敗しました。手動で選択してコピーしてください。");
+      }
+    });
+  </script>
+  </body>
+</html>
